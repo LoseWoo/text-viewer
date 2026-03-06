@@ -19,23 +19,26 @@
   <div id="home-view" class="view active">
     <header class="toolbar">
       <h1 class="toolbar-title">text.v</h1>
-      <button id="theme-toggle" class="icon-btn" aria-label="테마 전환">
-        <span class="theme-icon"></span>
-      </button>
+      <div class="toolbar-actions">
+        <label class="icon-btn" aria-label="파일 추가">
+          +
+          <input type="file" id="file-input" accept=".txt,.epub" hidden />
+        </label>
+        <button id="theme-toggle" class="icon-btn" aria-label="테마 전환">
+          <span class="theme-icon"></span>
+        </button>
+      </div>
     </header>
     <main class="home-content">
+      <div id="library" class="library">
+        <!-- Empty state shown when no books -->
+      </div>
       <div id="drop-zone" class="drop-zone">
         <div class="drop-zone-inner">
-          <div class="drop-icon">📖</div>
-          <p class="drop-text">파일을 선택하세요</p>
-          <p class="drop-sub">.txt, .epub 지원</p>
-          <label class="file-btn">
-            파일 열기
-            <input type="file" id="file-input" accept=".txt,.epub" hidden />
-          </label>
+          <div class="drop-icon">+</div>
+          <p class="drop-sub">파일을 여기에 드래그하거나 + 버튼을 누르세요</p>
         </div>
       </div>
-      <div id="library" class="library"></div>
     </main>
   </div>
 

@@ -3,7 +3,13 @@
     "allow": [
       "Bash(npm install -g surge)",
       "Bash(npx surge ./dist textv-reader.surge.sh)",
-      "Bash(gh auth status)"
+      "Bash(gh auth status)",
+      "Bash(git remote add origin https://github.com/LoseWoo/text.v.git)",
+      "Bash(git branch -M main)",
+      "Bash(git push -u origin main)",
+      "Bash(git remote set-url origin https://github.com/LoseWoo/text-viewer.git)",
+      "Bash(git push --force -u origin main)",
+      "Bash(git add -A)"
     ]
   }
 }

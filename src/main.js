@@ -237,45 +237,49 @@ async function renderLibrary() {
   }
 
   if (files.length === 0) {
-    container.innerHTML = ''
+    container.innerHTML = `
+      <div class="empty-shelf">
+        <div class="empty-shelf-icon">📚</div>
+        <p class="empty-shelf-text">서재가 비어있습니다</p>
+        <p class="empty-shelf-sub">파일을 열고 저장하면 여기에 표시됩니다</p>
+      </div>
+    `
     return
   }
 
-  const icon = (type) => type === 'epub' ? '📕' : '📄'
-  const formatSize = (bytes) => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-  const timeAgo = (ts) => {
-    const diff = Date.now() - ts
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return '방금 전'
-    if (mins < 60) return `${mins}분 전`
-    const hours = Math.floor(mins / 60)
-    if (hours < 24) return `${hours}시간 전`
-    return `${Math.floor(hours / 24)}일 전`
+  const bookColors = [
+    '#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400',
+    '#16a085', '#2c3e50', '#e74c3c', '#3498db', '#1abc9c'
+  ]
+  const getColor = (name) => bookColors[Math.abs([...name].reduce((a, c) => a + c.charCodeAt(0), 0)) % bookColors.length]
+  const shortName = (name) => {
+    const n = name.replace(/\.(txt|epub)$/i, '')
+    return n.length > 12 ? n.slice(0, 12) + '…' : n
   }
 
   container.innerHTML = `
-    <h3>라이브러리</h3>
-    ${files.map(f => `
-      <div class="library-item" data-id="${f.id}">
-        <div class="library-item-body" data-id="${f.id}">
-          <span class="library-icon">${icon(f.type)}</span>
-          <div class="library-info">
-            <div class="library-name">${f.name}</div>
-            <div class="library-meta">${formatSize(f.size)} · ${timeAgo(f.savedAt)}</div>
+    <div class="shelf-header">
+      <h3>내 서재</h3>
+      <span class="shelf-count">${files.length}권</span>
+    </div>
+    <div class="bookshelf">
+      ${files.map((f, i) => `
+        <div class="book" data-id="${f.id}" style="--book-color: ${getColor(f.name)}">
+          <div class="book-spine">
+            <span class="book-type">${f.type === 'epub' ? 'EPUB' : 'TXT'}</span>
+            <span class="book-title">${shortName(f.name)}</span>
           </div>
+          <button class="book-delete" data-id="${f.id}" data-name="${f.name}" aria-label="삭제">✕</button>
         </div>
-        <button class="library-delete" data-id="${f.id}" data-name="${f.name}" aria-label="삭제">✕</button>
-      </div>
-    `).join('')}
+      `).join('')}
+    </div>
+    <div class="shelf-wood"></div>
   `
 
-  // Open saved file
-  container.querySelectorAll('.library-item-body').forEach(el => {
-    el.addEventListener('click', async () => {
+  // Open saved file - click on book spine
+  container.querySelectorAll('.book').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      if (e.target.closest('.book-delete')) return
       const entry = await getFile(el.dataset.id)
       if (entry) {
         const file = entryToFile(entry)
@@ -287,7 +291,7 @@ async function renderLibrary() {
   })
 
   // Delete
-  container.querySelectorAll('.library-delete').forEach(btn => {
+  container.querySelectorAll('.book-delete').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation()
       confirmDelete(btn.dataset.id, btn.dataset.name)
