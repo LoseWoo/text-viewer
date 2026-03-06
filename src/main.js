@@ -615,6 +615,15 @@ function init() {
 
   setupDragDrop()
   renderLibrary()
+
+  // Dismiss splash screen
+  const splash = document.getElementById('splash')
+  if (splash) {
+    setTimeout(() => {
+      splash.classList.add('fade-out')
+      splash.addEventListener('transitionend', () => splash.remove())
+    }, 1200)
+  }
 }
 
 init()
