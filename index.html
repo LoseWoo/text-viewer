@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="text.v" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+  <title>text.v</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;600;700&family=IBM+Plex+Sans+KR:wght@400;600;700&family=Nanum+Gothic:wght@400;700&family=Nanum+Myeongjo:wght@400;700&family=Noto+Sans+KR:wght@400;600;700&family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Home View -->
+  <div id="home-view" class="view active">
+    <header class="toolbar">
+      <h1 class="toolbar-title">text.v</h1>
+      <button id="theme-toggle" class="icon-btn" aria-label="테마 전환">
+        <span class="theme-icon"></span>
+      </button>
+    </header>
+    <main class="home-content">
+      <div id="drop-zone" class="drop-zone">
+        <div class="drop-zone-inner">
+          <div class="drop-icon">📖</div>
+          <p class="drop-text">파일을 선택하세요</p>
+          <p class="drop-sub">.txt, .epub 지원</p>
+          <label class="file-btn">
+            파일 열기
+            <input type="file" id="file-input" accept=".txt,.epub" hidden />
+          </label>
+        </div>
+      </div>
+      <div id="library" class="library"></div>
+    </main>
+  </div>
+
+  <!-- Text Reader View -->
+  <div id="text-view" class="view">
+    <header class="toolbar">
+      <button id="text-back" class="icon-btn" aria-label="뒤로">←</button>
+      <h1 id="text-title" class="toolbar-title">파일명</h1>
+      <div class="toolbar-actions">
+        <button id="text-save" class="icon-btn save-btn" aria-label="저장">💾</button>
+        <button id="text-settings-btn" class="icon-btn" aria-label="설정">Aa</button>
+        <button id="text-theme" class="icon-btn" aria-label="테마 전환">
+          <span class="theme-icon"></span>
+        </button>
+      </div>
+    </header>
+    <main id="text-content" class="reader-content"></main>
+    <footer class="reader-footer">
+      <div id="text-progress" class="progress-bar"><div class="progress-fill"></div></div>
+    </footer>
+
+    <!-- Settings Panel -->
+    <div id="text-settings" class="settings-overlay hidden">
+      <div class="settings-panel">
+        <div class="settings-header">
+          <h2>읽기 설정</h2>
+          <button id="text-settings-close" class="icon-btn">✕</button>
+        </div>
+        <div class="settings-body">
+          <!-- Font Size -->
+          <div class="setting-group">
+            <label class="setting-label">글씨 크기</label>
+            <div class="font-size-control">
+              <button class="size-btn" data-delta="-1">A-</button>
+              <input type="range" id="text-font-range" class="size-slider" min="12" max="32" step="1" />
+              <button class="size-btn" data-delta="1">A+</button>
+              <span id="text-font-value" class="size-value">17px</span>
+            </div>
+          </div>
+          <!-- Font Family -->
+          <div class="setting-group">
+            <label class="setting-label">글꼴</label>
+            <div id="text-font-list" class="font-list">
+              <button class="font-item active" data-font="system">시스템 기본</button>
+              <button class="font-item" data-font="'Noto Sans KR', sans-serif">Noto Sans</button>
+              <button class="font-item" data-font="'Noto Serif KR', serif">Noto Serif</button>
+              <button class="font-item" data-font="'Gothic A1', sans-serif">Gothic A1</button>
+              <button class="font-item" data-font="'Nanum Gothic', sans-serif">나눔고딕</button>
+              <button class="font-item" data-font="'Nanum Myeongjo', serif">나눔명조</button>
+              <button class="font-item" data-font="'IBM Plex Sans KR', sans-serif">IBM Plex Sans</button>
+              <button class="font-item" data-font="monospace">모노스페이스</button>
+            </div>
+          </div>
+          <!-- Line Height -->
+          <div class="setting-group">
+            <label class="setting-label">줄 간격</label>
+            <div class="line-height-control">
+              <span class="lh-label">좁게</span>
+              <input type="range" id="text-lh-range" class="size-slider" min="1.2" max="2.4" step="0.1" />
+              <span class="lh-label">넓게</span>
+              <span id="text-lh-value" class="size-value">1.8</span>
+            </div>
+          </div>
+          <!-- Scroll Mode (EPUB only shown in epub settings) -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EPUB Reader View -->
+  <div id="epub-view" class="view">
+    <header class="toolbar">
+      <button id="epub-back" class="icon-btn" aria-label="뒤로">←</button>
+      <h1 id="epub-title" class="toolbar-title">EPUB</h1>
+      <div class="toolbar-actions">
+        <button id="epub-save" class="icon-btn save-btn" aria-label="저장">💾</button>
+        <button id="epub-toc-btn" class="icon-btn" aria-label="목차">☰</button>
+        <button id="epub-settings-btn" class="icon-btn" aria-label="설정">Aa</button>
+        <button id="epub-theme" class="icon-btn" aria-label="테마 전환">
+          <span class="theme-icon"></span>
+        </button>
+      </div>
+    </header>
+    <div id="epub-container" class="epub-container"></div>
+    <footer id="epub-footer" class="reader-footer">
+      <div id="epub-nav" class="epub-nav">
+        <button id="epub-prev" class="nav-btn">◀ 이전</button>
+        <span id="epub-progress-text" class="progress-text">0%</span>
+        <button id="epub-next" class="nav-btn">다음 ▶</button>
+      </div>
+      <div id="epub-progress" class="progress-bar"><div class="progress-fill"></div></div>
+    </footer>
+
+    <!-- TOC Sidebar -->
+    <div id="toc-overlay" class="toc-overlay hidden">
+      <div class="toc-panel">
+        <div class="toc-header">
+          <h2>목차</h2>
+          <button id="toc-close" class="icon-btn">✕</button>
+        </div>
+        <ul id="toc-list" class="toc-list"></ul>
+      </div>
+    </div>
+
+    <!-- EPUB Settings Panel -->
+    <div id="epub-settings" class="settings-overlay hidden">
+      <div class="settings-panel">
+        <div class="settings-header">
+          <h2>읽기 설정</h2>
+          <button id="epub-settings-close" class="icon-btn">✕</button>
+        </div>
+        <div class="settings-body">
+          <div class="setting-group">
+            <label class="setting-label">글씨 크기</label>
+            <div class="font-size-control">
+              <button class="size-btn" data-delta="-1">A-</button>
+              <input type="range" id="epub-font-range" class="size-slider" min="12" max="32" step="1" />
+              <button class="size-btn" data-delta="1">A+</button>
+              <span id="epub-font-value" class="size-value">17px</span>
+            </div>
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">글꼴</label>
+            <div id="epub-font-list" class="font-list">
+              <button class="font-item active" data-font="system">시스템 기본</button>
+              <button class="font-item" data-font="'Noto Sans KR', sans-serif">Noto Sans</button>
+              <button class="font-item" data-font="'Noto Serif KR', serif">Noto Serif</button>
+              <button class="font-item" data-font="'Gothic A1', sans-serif">Gothic A1</button>
+              <button class="font-item" data-font="'Nanum Gothic', sans-serif">나눔고딕</button>
+              <button class="font-item" data-font="'Nanum Myeongjo', serif">나눔명조</button>
+              <button class="font-item" data-font="'IBM Plex Sans KR', sans-serif">IBM Plex Sans</button>
+              <button class="font-item" data-font="monospace">모노스페이스</button>
+            </div>
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">줄 간격</label>
+            <div class="line-height-control">
+              <span class="lh-label">좁게</span>
+              <input type="range" id="epub-lh-range" class="size-slider" min="1.2" max="2.4" step="0.1" />
+              <span class="lh-label">넓게</span>
+              <span id="epub-lh-value" class="size-value">1.8</span>
+            </div>
+          </div>
+          <div class="setting-group">
+            <label class="setting-label">스크롤 모드</label>
+            <div class="scroll-mode-control">
+              <button id="epub-mode-page" class="mode-btn active">페이지 넘기기</button>
+              <button id="epub-mode-scroll" class="mode-btn">연속 스크롤</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

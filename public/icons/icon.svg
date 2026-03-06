@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1c1c1e"/>
+  <text x="256" y="200" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="72" font-weight="700" fill="#e5e5e7">text</text>
+  <text x="256" y="340" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="140" font-weight="300" fill="#0a84ff">.v</text>
+</svg>

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install -g surge)",
+      "Bash(npx surge ./dist textv-reader.surge.sh)",
+      "Bash(gh auth status)"
+    ]
+  }
+}
