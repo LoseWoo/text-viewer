@@ -269,11 +269,92 @@ function renderShelfSection(shelfName, files, shelfId) {
 }
 
 let longPressTimer = null
+let dragState = null // { fileId, ghost, startX, startY, active }
+
+function startDrag(el, touch) {
+  const rect = el.getBoundingClientRect()
+  const ghost = el.cloneNode(true)
+  ghost.className = 'book drag-ghost'
+  ghost.style.cssText = `--book-color: ${getComputedStyle(el).getPropertyValue('--book-color')}; width: ${rect.width}px; height: ${rect.height}px;`
+  ghost.querySelector('.book-delete')?.remove()
+  document.body.appendChild(ghost)
+
+  dragState = {
+    fileId: el.dataset.id,
+    ghost,
+    originEl: el,
+    startX: touch.clientX,
+    startY: touch.clientY,
+    active: true
+  }
+
+  positionGhost(touch.clientX, touch.clientY)
+  el.classList.add('drag-origin')
+  document.querySelectorAll('.shelf-section').forEach(s => s.classList.add('drop-target'))
+
+  // Haptic feedback
+  if (navigator.vibrate) navigator.vibrate(30)
+}
+
+function positionGhost(x, y) {
+  if (!dragState?.ghost) return
+  dragState.ghost.style.left = `${x - 26}px`
+  dragState.ghost.style.top = `${y - 80}px`
+}
+
+function handleDragMove(e) {
+  if (!dragState?.active) return
+  e.preventDefault()
+  const touch = e.touches[0]
+  positionGhost(touch.clientX, touch.clientY)
+
+  // Highlight hovered shelf
+  document.querySelectorAll('.shelf-section').forEach(s => s.classList.remove('drop-hover'))
+  const target = getShelfSectionAt(touch.clientX, touch.clientY)
+  if (target) target.classList.add('drop-hover')
+}
+
+function handleDragEnd(e) {
+  if (!dragState?.active) return
+  const touch = e.changedTouches[0]
+  const target = getShelfSectionAt(touch.clientX, touch.clientY)
+
+  if (target) {
+    const targetShelfId = target.dataset.shelfId
+    if (targetShelfId === 'uncategorized') {
+      removeFileFromShelf(dragState.fileId)
+    } else {
+      addFileToShelf(targetShelfId, dragState.fileId)
+    }
+    showToast('이동됨')
+  }
+
+  // Cleanup
+  dragState.ghost?.remove()
+  dragState.originEl?.classList.remove('drag-origin')
+  document.querySelectorAll('.shelf-section').forEach(s => {
+    s.classList.remove('drop-target', 'drop-hover')
+  })
+  dragState = null
+  if (target) renderLibrary()
+}
+
+function getShelfSectionAt(x, y) {
+  const sections = document.querySelectorAll('.shelf-section')
+  for (const section of sections) {
+    const rect = section.getBoundingClientRect()
+    if (y >= rect.top && y <= rect.bottom && x >= rect.left && x <= rect.right) {
+      return section
+    }
+  }
+  return null
+}
 
 function attachLibraryListeners(container) {
   container.querySelectorAll('.book').forEach(el => {
     el.addEventListener('click', async (e) => {
       if (e.target.closest('.book-delete')) return
+      if (dragState) return // ignore click after drag
       const entry = await getFile(el.dataset.id)
       if (entry) {
         openFileInReader(entryToFile(entry))
@@ -282,14 +363,42 @@ function attachLibraryListeners(container) {
       }
     })
 
-    // Long-press for shelf assignment
-    el.addEventListener('touchstart', () => {
+    // Long-press → start drag or show picker
+    el.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.book-delete')) return
+      const touch = e.touches[0]
+      const startX = touch.clientX
+      const startY = touch.clientY
+      let moved = false
+
+      const moveCheck = (me) => {
+        const mt = me.touches[0]
+        if (Math.abs(mt.clientX - startX) > 8 || Math.abs(mt.clientY - startY) > 8) {
+          moved = true
+          clearTimeout(longPressTimer)
+        }
+      }
+      el.addEventListener('touchmove', moveCheck, { passive: true })
+
       longPressTimer = setTimeout(() => {
-        showShelfPicker(el.dataset.id)
-      }, 500)
+        el.removeEventListener('touchmove', moveCheck)
+        if (!moved) {
+          // Check if shelves exist — if yes, start drag; if no, show picker
+          const shelves = getShelves()
+          if (shelves.length > 0) {
+            startDrag(el, touch)
+          } else {
+            showShelfPicker(el.dataset.id)
+          }
+        }
+      }, 400)
     }, { passive: true })
+
     el.addEventListener('touchend', () => clearTimeout(longPressTimer))
-    el.addEventListener('touchmove', () => clearTimeout(longPressTimer))
+    el.addEventListener('touchmove', () => {
+      // If drag is not yet active, cancel long press on move
+      if (!dragState?.active) clearTimeout(longPressTimer)
+    })
 
     // Desktop: right-click
     el.addEventListener('contextmenu', (e) => {
@@ -297,6 +406,10 @@ function attachLibraryListeners(container) {
       showShelfPicker(el.dataset.id)
     })
   })
+
+  // Global drag handlers on container
+  container.addEventListener('touchmove', handleDragMove, { passive: false })
+  container.addEventListener('touchend', handleDragEnd)
 
   container.querySelectorAll('.book-delete').forEach(btn => {
     btn.addEventListener('click', (e) => {

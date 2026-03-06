@@ -393,6 +393,42 @@ body {
   }
 }
 
+/* ===== Drag & Drop ===== */
+.drag-ghost {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  opacity: 0.9;
+  transform: scale(1.1);
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.35));
+  transition: transform 0.15s;
+}
+
+.drag-origin {
+  opacity: 0.25;
+  transform: scale(0.9);
+}
+
+.shelf-section.drop-target .shelf-header {
+  transition: background 0.2s;
+}
+
+.shelf-section.drop-hover {
+  background: var(--accent-light);
+  border-radius: 12px;
+  transition: background 0.15s;
+}
+
+.shelf-section.drop-hover .shelf-header h3 {
+  color: var(--accent);
+  transition: color 0.15s;
+}
+
+.shelf-section.drop-hover .shelf-wood {
+  background: linear-gradient(180deg, var(--accent) 0%, rgba(0,122,255,0.6) 100%);
+  transition: background 0.15s;
+}
+
 /* Empty Shelf */
 .empty-shelf {
   display: flex;
