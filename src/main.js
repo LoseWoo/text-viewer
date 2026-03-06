@@ -2,6 +2,10 @@ import './style.css'
 import { TextReader } from './TextReader.js'
 import { EpubReader } from './EpubReader.js'
 import { saveFile, getFile, deleteFile, listFiles, entryToFile } from './FileStorage.js'
+import {
+  getShelves, createShelf, renameShelf, deleteShelf,
+  addFileToShelf, removeFileFromShelf, getShelfForFile
+} from './ShelfStorage.js'
 
 // ===== State =====
 let currentView = 'home'
@@ -216,6 +220,7 @@ function confirmDelete(id, name) {
   overlay.querySelector('.confirm-cancel').addEventListener('click', () => overlay.remove())
   overlay.querySelector('.confirm-delete').addEventListener('click', async () => {
     await deleteFile(id)
+    removeFileFromShelf(id)
     overlay.remove()
     showToast('삭제됨')
     renderLibrary()
@@ -226,6 +231,87 @@ function confirmDelete(id, name) {
 }
 
 // ===== Library (Saved Files) =====
+const bookColors = [
+  '#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400',
+  '#16a085', '#2c3e50', '#e74c3c', '#3498db', '#1abc9c'
+]
+const getColor = (name) => bookColors[Math.abs([...name].reduce((a, c) => a + c.charCodeAt(0), 0)) % bookColors.length]
+const shortName = (name) => {
+  const n = name.replace(/\.(txt|epub)$/i, '')
+  return n.length > 12 ? n.slice(0, 12) + '…' : n
+}
+
+function renderShelfSection(shelfName, files, shelfId) {
+  const dataAttr = shelfId ? `data-shelf-id="${shelfId}"` : 'data-shelf-id="uncategorized"'
+  return `
+    <div class="shelf-section" ${dataAttr}>
+      <div class="shelf-header">
+        <h3>${shelfName}</h3>
+        <span class="shelf-count">${files.length}권</span>
+      </div>
+      <div class="bookshelf">
+        ${files.length === 0
+          ? '<p class="shelf-empty-msg">비어있는 서재</p>'
+          : files.map(f => `
+            <div class="book" data-id="${f.id}" style="--book-color: ${getColor(f.name)}">
+              <div class="book-spine">
+                <span class="book-type">${f.type === 'epub' ? 'EPUB' : 'TXT'}</span>
+                <span class="book-title">${shortName(f.name)}</span>
+              </div>
+              <button class="book-delete" data-id="${f.id}" data-name="${f.name}" aria-label="삭제">✕</button>
+            </div>
+          `).join('')
+        }
+      </div>
+      <div class="shelf-wood"></div>
+    </div>
+  `
+}
+
+let longPressTimer = null
+
+function attachLibraryListeners(container) {
+  container.querySelectorAll('.book').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      if (e.target.closest('.book-delete')) return
+      const entry = await getFile(el.dataset.id)
+      if (entry) {
+        openFileInReader(entryToFile(entry))
+      } else {
+        showToast('파일을 찾을 수 없습니다')
+      }
+    })
+
+    // Long-press for shelf assignment
+    el.addEventListener('touchstart', () => {
+      longPressTimer = setTimeout(() => {
+        showShelfPicker(el.dataset.id)
+      }, 500)
+    }, { passive: true })
+    el.addEventListener('touchend', () => clearTimeout(longPressTimer))
+    el.addEventListener('touchmove', () => clearTimeout(longPressTimer))
+
+    // Desktop: right-click
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault()
+      showShelfPicker(el.dataset.id)
+    })
+  })
+
+  container.querySelectorAll('.book-delete').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation()
+      confirmDelete(btn.dataset.id, btn.dataset.name)
+    })
+  })
+
+  const addBtn = container.querySelector('#add-shelf-btn')
+  if (addBtn) addBtn.addEventListener('click', showCreateShelfDialog)
+
+  const manageBtn = container.querySelector('#manage-shelves-btn')
+  if (manageBtn) manageBtn.addEventListener('click', showManageShelvesDialog)
+}
+
 async function renderLibrary() {
   const container = document.getElementById('library')
   let files
@@ -247,55 +333,195 @@ async function renderLibrary() {
     return
   }
 
-  const bookColors = [
-    '#c0392b', '#2980b9', '#27ae60', '#8e44ad', '#d35400',
-    '#16a085', '#2c3e50', '#e74c3c', '#3498db', '#1abc9c'
-  ]
-  const getColor = (name) => bookColors[Math.abs([...name].reduce((a, c) => a + c.charCodeAt(0), 0)) % bookColors.length]
-  const shortName = (name) => {
-    const n = name.replace(/\.(txt|epub)$/i, '')
-    return n.length > 12 ? n.slice(0, 12) + '…' : n
-  }
+  const fileMap = new Map(files.map(f => [f.id, f]))
+  const shelves = getShelves()
 
-  container.innerHTML = `
-    <div class="shelf-header">
-      <h3>내 서재</h3>
-      <span class="shelf-count">${files.length}권</span>
+  const assignedIds = new Set()
+  shelves.forEach(s => s.fileIds.forEach(id => {
+    if (fileMap.has(id)) assignedIds.add(id)
+  }))
+
+  const uncategorized = files.filter(f => !assignedIds.has(f.id))
+
+  let html = `
+    <div class="library-header">
+      <h2>내 서재</h2>
+      <div class="library-actions">
+        <button id="add-shelf-btn" class="shelf-action-btn">+ 서재</button>
+        ${shelves.length > 0 ? '<button id="manage-shelves-btn" class="shelf-action-btn">관리</button>' : ''}
+      </div>
     </div>
-    <div class="bookshelf">
-      ${files.map((f, i) => `
-        <div class="book" data-id="${f.id}" style="--book-color: ${getColor(f.name)}">
-          <div class="book-spine">
-            <span class="book-type">${f.type === 'epub' ? 'EPUB' : 'TXT'}</span>
-            <span class="book-title">${shortName(f.name)}</span>
-          </div>
-          <button class="book-delete" data-id="${f.id}" data-name="${f.name}" aria-label="삭제">✕</button>
-        </div>
-      `).join('')}
-    </div>
-    <div class="shelf-wood"></div>
   `
 
-  // Open saved file - click on book spine
-  container.querySelectorAll('.book').forEach(el => {
-    el.addEventListener('click', async (e) => {
-      if (e.target.closest('.book-delete')) return
-      const entry = await getFile(el.dataset.id)
-      if (entry) {
-        const file = entryToFile(entry)
-        openFileInReader(file)
+  shelves.forEach(shelf => {
+    const shelfFiles = shelf.fileIds.map(id => fileMap.get(id)).filter(Boolean)
+    html += renderShelfSection(shelf.name, shelfFiles, shelf.id)
+  })
+
+  if (uncategorized.length > 0 || shelves.length > 0) {
+    html += renderShelfSection('미분류', uncategorized, null)
+  }
+
+  container.innerHTML = html
+  attachLibraryListeners(container)
+}
+
+// ===== Shelf Management =====
+function showCreateShelfDialog() {
+  const overlay = document.createElement('div')
+  overlay.className = 'confirm-overlay'
+  overlay.innerHTML = `
+    <div class="confirm-dialog">
+      <p class="dialog-title">새 서재</p>
+      <input type="text" class="shelf-name-input" placeholder="서재 이름 입력" maxlength="20" />
+      <div class="confirm-actions">
+        <button class="confirm-cancel">취소</button>
+        <button class="confirm-ok">만들기</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  const input = overlay.querySelector('.shelf-name-input')
+  setTimeout(() => input.focus(), 100)
+
+  overlay.querySelector('.confirm-cancel').addEventListener('click', () => overlay.remove())
+  overlay.querySelector('.confirm-ok').addEventListener('click', () => {
+    const name = input.value.trim()
+    if (name) {
+      createShelf(name)
+      overlay.remove()
+      showToast(`"${name}" 서재 생성됨`)
+      renderLibrary()
+    }
+  })
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') overlay.querySelector('.confirm-ok').click()
+  })
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove()
+  })
+}
+
+function showShelfPicker(fileId) {
+  const shelves = getShelves()
+  const currentShelf = getShelfForFile(fileId)
+
+  const overlay = document.createElement('div')
+  overlay.className = 'confirm-overlay action-overlay'
+  overlay.innerHTML = `
+    <div class="action-sheet">
+      <div class="action-sheet-title">서재 선택</div>
+      <div class="action-sheet-list">
+        <button class="action-sheet-item ${!currentShelf ? 'active' : ''}" data-shelf-id="">미분류</button>
+        ${shelves.map(s => `
+          <button class="action-sheet-item ${currentShelf?.id === s.id ? 'active' : ''}" data-shelf-id="${s.id}">${s.name}</button>
+        `).join('')}
+      </div>
+      <button class="action-sheet-cancel">취소</button>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  overlay.querySelectorAll('.action-sheet-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const shelfId = btn.dataset.shelfId
+      if (shelfId) {
+        addFileToShelf(shelfId, fileId)
       } else {
-        showToast('파일을 찾을 수 없습니다')
+        removeFileFromShelf(fileId)
       }
+      overlay.remove()
+      renderLibrary()
     })
   })
 
-  // Delete
-  container.querySelectorAll('.book-delete').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation()
-      confirmDelete(btn.dataset.id, btn.dataset.name)
+  overlay.querySelector('.action-sheet-cancel').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove()
+  })
+}
+
+function showManageShelvesDialog() {
+  const shelves = getShelves()
+
+  const overlay = document.createElement('div')
+  overlay.className = 'confirm-overlay action-overlay'
+  overlay.innerHTML = `
+    <div class="action-sheet">
+      <div class="action-sheet-title">서재 관리</div>
+      <div class="manage-shelves-list">
+        ${shelves.map(s => `
+          <div class="manage-shelf-item">
+            <span class="manage-shelf-name">${s.name}</span>
+            <div class="manage-shelf-actions">
+              <button class="manage-rename" data-shelf-id="${s.id}" data-name="${s.name}">이름변경</button>
+              <button class="manage-delete" data-shelf-id="${s.id}" data-name="${s.name}">삭제</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <button class="action-sheet-cancel">닫기</button>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  overlay.querySelectorAll('.manage-rename').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showRenameShelfDialog(btn.dataset.shelfId, btn.dataset.name, overlay)
     })
+  })
+
+  overlay.querySelectorAll('.manage-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      deleteShelf(btn.dataset.shelfId)
+      overlay.remove()
+      showToast(`"${btn.dataset.name}" 서재 삭제됨`)
+      renderLibrary()
+    })
+  })
+
+  overlay.querySelector('.action-sheet-cancel').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove()
+  })
+}
+
+function showRenameShelfDialog(shelfId, currentName, parentOverlay) {
+  if (parentOverlay) parentOverlay.remove()
+
+  const overlay = document.createElement('div')
+  overlay.className = 'confirm-overlay'
+  overlay.innerHTML = `
+    <div class="confirm-dialog">
+      <p class="dialog-title">서재 이름 변경</p>
+      <input type="text" class="shelf-name-input" value="${currentName}" maxlength="20" />
+      <div class="confirm-actions">
+        <button class="confirm-cancel">취소</button>
+        <button class="confirm-ok">변경</button>
+      </div>
+    </div>
+  `
+  document.body.appendChild(overlay)
+
+  const input = overlay.querySelector('.shelf-name-input')
+  setTimeout(() => { input.focus(); input.select() }, 100)
+
+  overlay.querySelector('.confirm-cancel').addEventListener('click', () => overlay.remove())
+  overlay.querySelector('.confirm-ok').addEventListener('click', () => {
+    const name = input.value.trim()
+    if (name) {
+      renameShelf(shelfId, name)
+      overlay.remove()
+      showToast('이름 변경됨')
+      renderLibrary()
+    }
+  })
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') overlay.querySelector('.confirm-ok').click()
+  })
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.remove()
   })
 }
 
